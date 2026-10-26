@@ -72,7 +72,16 @@ def vendor(monkeypatch):
     isolated = importlib.util.module_from_spec(spec)
     with monkeypatch.context() as load:
         load.setattr(torch_fl, "_C", bridge)
+        detector = importlib.import_module("torch_fl._platform")
+        load.setattr(detector, "detect_platform", lambda: "musa")
+        # The host DCU shim also replaces torch.cuda.Stream/Event. The generic
+        # facade must inherit the CPU wheel's original compatibility classes,
+        # not a native torch.Stream subclass supplied by that host provider.
+        load.setattr(torch.cuda, "Stream", torch.cuda.streams.Stream)
+        load.setattr(torch.cuda, "Event", torch.cuda.streams.Event)
         spec.loader.exec_module(isolated)
+    # MusaStream imports the facade by its canonical name inside its methods.
+    monkeypatch.setitem(sys.modules, "torch_fl.flagos", isolated)
     monkeypatch.setattr(sys.modules[__name__], "flagos", isolated)
     return select
 
