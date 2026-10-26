@@ -37,9 +37,9 @@ import sys
 import types
 
 import pytest
-import torch
 
 import torch_fl
+import torch
 from torch_fl import flagos
 
 _ASCEND_STREAM_MODULE = "torch_fl.accelerator.ascend.acl_stream"
