@@ -3010,3 +3010,19 @@ def _loaded_shared_objects():
 # first kernel -- so it has to happen here, not inside a kernel path.
 _preload_xcudart_for_kunlunxin()
 _bind_kunlunxin_triton_stream()
+
+
+# The optional boxed DCU provider shares the vendor HIP registry. In the OFF
+# wheel these symbols do not exist; preserve its existing compatibility API.
+if hasattr(_C, "_dcu_stream_info"):
+    from torch_fl.accelerator.hygon.dcu_stream import (
+        DcuEvent as Event,
+        DcuExternalStream as ExternalStream,
+        DcuStream as Stream,
+        current_stream,
+        default_stream,
+        set_stream,
+        stream_context as stream,
+    )
+
+    __all__ += ["ExternalStream", "default_stream", "set_stream"]
