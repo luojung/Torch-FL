@@ -519,11 +519,10 @@ _FLAGGEMS_KWARG_OK = {
     "str?",
     "SymInt",
     "SymInt?",
-    # Tensor: only ever produced by the out_variant_gemskwout path below, which
-    # forwards an aten `out` arg into a gems required keyword-only tensor param.
-    # BuildPyKwargs -> IValueToPython already handles isTensor(), so no C++
-    # change is needed. Not reachable from _flaggems_split_kwargs: that path
-    # only ever moves TRAILING aten args, and out args are never trailing.
+    # Tensor is supported by IValueToPython for required out kwargs. The one
+    # optional-Tensor keyword-only path currently admitted below is the Hygon
+    # `_flash_attention_forward` wrapper; keep Tensor? out of the global set so
+    # a future codegen run cannot widen unrelated routes accidentally.
     "Tensor",
 }
 
@@ -1054,7 +1053,10 @@ def discover_flaggems_ops(codegen_ops, funcs):
             continue  # non-suffix ScalarType -> can't safely reorder
         if not all(_flaggems_type_ok(t) for t, _ in passed):
             continue
-        if kwargs and not all(t in _FLAGGEMS_KWARG_OK for t, _ in kwargs):
+        kwarg_ok = _FLAGGEMS_KWARG_OK
+        if op == "_flash_attention_forward":
+            kwarg_ok = kwarg_ok | {"Tensor?"}
+        if kwargs and not all(t in kwarg_ok for t, _ in kwargs):
             continue
         # Final required-keyword gate. Now that every branch has settled
         # `kwargs`, demand that each required keyword-only gems param is
@@ -2671,6 +2673,10 @@ def main():
         cuda_route_exceptions = {
             # contract: keep torch.conj lazy (see above)
             "_conj",
+            # Hygon's FP32 implementation is a DCU/FlagGems promotion. Keep
+            # the generic CUDA conf on its existing boxing route; the DCU
+            # platform conf promotes this op only after its own measurement.
+            "_flash_attention_forward",
             # compile: FlagTree AABS shrinks tl.dot's K tile below 16 (see above)
             "addmm",
             "addmm.dtype",

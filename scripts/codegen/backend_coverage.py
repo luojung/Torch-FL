@@ -43,7 +43,7 @@ FLAGGEMS_PYTHON_OPS = frozenset({
     "_euclidean_dist", "_fake_quantize_learnable_per_channel_affine_backward",
     "_fake_quantize_learnable_per_tensor_affine",
     "_fake_quantize_per_tensor_affine_cachemask_tensor_qparams",
-    "_flash_attention_backward", "_fused_moving_avg_obs_fq_helper",
+    "_flash_attention_backward", "_flash_attention_forward", "_fused_moving_avg_obs_fq_helper",
     "_fused_rms_norm", "_fused_rms_norm_backward", "_is_all_true",
     "_linalg_eigvals", "_log_softmax", "_log_softmax_backward_data",
     "_masked_scale", "_native_batch_norm_legit",

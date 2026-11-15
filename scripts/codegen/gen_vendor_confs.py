@@ -1715,6 +1715,12 @@ METAX_COMPOSITE_FLAGGEMS = {"scaled_dot_product_attention"}
 # for what is still unmeasured on the shapes this route does not take.
 DCU_COMPOSITE_FLAGGEMS = {"scaled_dot_product_attention"}
 
+# Low-level Hygon FA forward was measured through the rebuilt Torch-FL
+# PrivateUse1 -> Backend::kFlagGems -> Python wrapper path on DCU for FP32
+# dropout=0 and dropout=0.2. Keep this promotion DCU-local; it must not widen
+# the shared ceiling or change other boxing platforms.
+DCU_FLAGGEMS_MEASURED = {"_flash_attention_forward"}
+
 # FlagGems coverage that arrived from a discovery widening rather than from a
 # measurement on the native-kernel vendors, and the vendors that therefore keep
 # the routes their own last FlagGems run measured.
@@ -1752,6 +1758,8 @@ DCU_COMPOSITE_FLAGGEMS = {"scaled_dot_product_attention"}
 # and the vendor kernel that is supposed to serve it would stop being reached.
 FLAGGEMS_PENDING_NATIVE_VENDORS = ("ascend", "gcu", "musa")
 FLAGGEMS_PENDING_NATIVE_OPS = frozenset({
+    # Hygon-specific FP32 FA promotion is not measured on native vendors.
+    "_flash_attention_forward",
     "_adaptive_avg_pool2d_backward", "_adaptive_avg_pool3d_backward",
     "_batch_norm_with_update_functional", "_cdist_forward",
     "_cholesky_solve_helper", "_compute_linear_combination",
@@ -1972,15 +1980,13 @@ def boxing_cpp_ops(conf_dir: Path, filename: str, fg_cpp: set) -> set:
 def boxing_measured_python_ops(filename: str) -> set:
     """Extra FlagGems Python ops a boxing platform routes on measured evidence.
 
-    These ops are outside the shared coverage ceiling (``FLAGGEMS_PYTHON_OPS``)
-    because codegen_ops.py's ``flaggems_runtime_broken`` holds them for every
-    platform -- a cohort claim that only the platform holding the matching
-    FlagGems build can discharge. MetaX has, so it routes them; see
-    METAX_FLAGGEMS_MEASURED for the measurement and for why the hold stays
-    elsewhere. METAX_COMPOSITE_FLAGGEMS and DCU_COMPOSITE_FLAGGEMS are outside
-    the ceiling for a different reason -- they are composites no coverage scan
-    could see -- but they are measurements held the same way, each on its own
-    platform.
+    These ops are either outside the shared coverage ceiling
+    (``FLAGGEMS_PYTHON_OPS``) because a runtime-broken hold is platform-local,
+    or are platform-specific promotions whose existing ``cuda`` line would
+    otherwise be recovered as a Triton gap. The latter must be discharged by a
+    hardware measurement on that boxing platform; see the ``*_MEASURED`` sets
+    below. Composite entries are outside the ceiling because no coverage scan
+    can see them, but they are held the same way, each on its own platform.
 
     Returning them from here rather than widening the coverage set is what keeps
     a measurement taken on one platform from becoming a route on another: a
@@ -1989,7 +1995,7 @@ def boxing_measured_python_ops(filename: str) -> set:
     if filename == "backends_metax.conf":
         return METAX_FLAGGEMS_MEASURED | METAX_COMPOSITE_FLAGGEMS
     if filename == "backends_dcu.conf":
-        return DCU_COMPOSITE_FLAGGEMS
+        return DCU_COMPOSITE_FLAGGEMS | DCU_FLAGGEMS_MEASURED
     return set()
 
 

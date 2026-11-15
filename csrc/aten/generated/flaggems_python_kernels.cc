@@ -163,6 +163,16 @@ at::Tensor PrivFakeQuantizeLearnablePerTensorAffineKernelPython(const at::Tensor
   return {result[0], result[1]};
 }
 
+::std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor> PrivFlashAttentionForwardKernelPython(const at::Tensor & query, const at::Tensor & key, const at::Tensor & value, const ::std::optional<at::Tensor> & cum_seq_q, const ::std::optional<at::Tensor> & cum_seq_k, int64_t max_q, int64_t max_k, double dropout_p, bool is_causal, bool return_debug_mask, ::std::optional<double> scale, ::std::optional<int64_t> window_size_left, ::std::optional<int64_t> window_size_right, const ::std::optional<at::Tensor> & seqused_k, const ::std::optional<at::Tensor> & alibi_slopes) {
+  auto result = CallPythonOp_GenericKwTuple("flag_gems._flash_attention_forward", {query, key, value, cum_seq_q, cum_seq_k, max_q, max_k, dropout_p, is_causal, return_debug_mask}, {PyKwarg{"scale", scale}, PyKwarg{"window_size_left", window_size_left}, PyKwarg{"window_size_right", window_size_right}, PyKwarg{"seqused_k", seqused_k}, PyKwarg{"alibi_slopes", alibi_slopes}}, 5);
+  UnboxToFlagos(result[0]);
+  UnboxToFlagos(result[1]);
+  UnboxToFlagos(result[2]);
+  UnboxToFlagos(result[3]);
+  UnboxToFlagos(result[4]);
+  return {result[0], result[1], result[2], result[3], result[4]};
+}
+
 ::std::tuple<at::Tensor,at::Tensor,at::Tensor> PrivFlashAttentionBackwardKernelPython(const at::Tensor & grad_out, const at::Tensor & query, const at::Tensor & key, const at::Tensor & value, const at::Tensor & out, const at::Tensor & logsumexp, const at::Tensor & cum_seq_q, const at::Tensor & cum_seq_k, int64_t max_q, int64_t max_k, double dropout_p, bool is_causal, const at::Tensor & rng_state, const at::Tensor & unused, ::std::optional<double> scale, ::std::optional<int64_t> window_size_left, ::std::optional<int64_t> window_size_right) {
   auto result = CallPythonOp_GenericKwTuple("flag_gems.flash_attention_backward", {grad_out, query, key, value, out, logsumexp, cum_seq_q, cum_seq_k, max_q, max_k, dropout_p, is_causal, rng_state, unused}, {PyKwarg{"scale", scale}, PyKwarg{"window_size_left", window_size_left}, PyKwarg{"window_size_right", window_size_right}}, 3);
   UnboxToFlagos(result[0]);
@@ -4210,6 +4220,7 @@ REGISTER_IMPL_TO_DISPATCHER(PrivFakeQuantizeLearnablePerChannelAffineBackwardFn,
 REGISTER_IMPL_TO_DISPATCHER(PrivFakeQuantizeLearnablePerTensorAffineFn, priv_fake_quantize_learnable_per_tensor_affine_dispatcher, Backend::kFlagGems, PrivFakeQuantizeLearnablePerTensorAffineKernelPython)
 REGISTER_IMPL_TO_DISPATCHER(PrivFakeQuantizeLearnablePerTensorAffineBackwardFn, priv_fake_quantize_learnable_per_tensor_affine_backward_dispatcher, Backend::kFlagGems, PrivFakeQuantizeLearnablePerTensorAffineBackwardKernelPython)
 REGISTER_IMPL_TO_DISPATCHER(PrivFakeQuantizePerTensorAffineCachemaskTensorQparamsFn, priv_fake_quantize_per_tensor_affine_cachemask_tensor_qparams_dispatcher, Backend::kFlagGems, PrivFakeQuantizePerTensorAffineCachemaskTensorQparamsKernelPython)
+REGISTER_IMPL_TO_DISPATCHER(PrivFlashAttentionForwardFn, priv_flash_attention_forward_dispatcher, Backend::kFlagGems, PrivFlashAttentionForwardKernelPython)
 REGISTER_IMPL_TO_DISPATCHER(PrivFlashAttentionBackwardFn, priv_flash_attention_backward_dispatcher, Backend::kFlagGems, PrivFlashAttentionBackwardKernelPython)
 REGISTER_IMPL_TO_DISPATCHER(PrivFusedMovingAvgObsFqHelperFn, priv_fused_moving_avg_obs_fq_helper_dispatcher, Backend::kFlagGems, PrivFusedMovingAvgObsFqHelperKernelPython)
 REGISTER_IMPL_TO_DISPATCHER(PrivFusedRmsNormFn, priv_fused_rms_norm_dispatcher, Backend::kFlagGems, PrivFusedRmsNormKernelPython)
