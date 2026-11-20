@@ -25,5 +25,8 @@ FLAGOS_EXPORT void SetCurrentDevice(DeviceIndex device);
 FLAGOS_EXPORT DeviceIndex ExchangeDevice(DeviceIndex device);
 FLAGOS_EXPORT bool HasOwnedStreams() noexcept;
 FLAGOS_EXPORT uintptr_t OwnedStreamHandle(int64_t device, bool use_default);
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+FLAGOS_EXPORT uintptr_t BoxedDcuStreamHandle(int64_t id, int64_t device);
+#endif
 
 } // namespace c10::flagos

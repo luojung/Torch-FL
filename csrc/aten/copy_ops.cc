@@ -5,6 +5,7 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 #include "copy_ops.h"
+#include "stream_copy.h"
 #include "contiguous_ops.h"
 #include "copy_dispatcher.h"
 #include "empty.h"
@@ -207,7 +208,9 @@ class BlockingCopyGuard {
 
  private:
   void DrainCurrentQueue() {
-#if defined(FLAGOS_COPY_HAS_CUDA_STREAM)
+#if defined(FLAGOS_DCU_VENDOR_STREAMS)
+    // BlockingRuntimeMemcpy queues on the selected stream and waits for it.
+#elif defined(FLAGOS_COPY_HAS_CUDA_STREAM)
     auto stream = c10::cuda::getCurrentCUDAStream();
     if (stream.stream() != nullptr) {
       stream.synchronize();
@@ -338,6 +341,11 @@ void CrossDeviceMemcpy(
     size_t nbytes,
     const at::Tensor& src,
     const at::Tensor& dst) {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+  c10::flagos::dcu::CopyDeviceBytes(
+      dst_ptr, dst.device().index(), src_ptr, src.device().index(), nbytes);
+  return;
+#endif
 #if defined(USE_KUNLUNXIN)
   // Kunlunxin's `Memcpy` is `xpu_memcpy`, and its DEVICE_TO_DEVICE kind is a
   // same-card copy: handed two pointers that live on different XPUs it returns
@@ -482,7 +490,7 @@ void BlockingMemcpy(
   // Qwen3 backward): the step completed, the gradients stayed finite, and the
   // loss went NaN a few steps later. Report it where it happens instead.
   TORCH_CHECK(
-      Memcpy(dst, src, nbytes, kind) == Success,
+      BlockingRuntimeMemcpy(dst, src, nbytes, kind) == Success,
       "flagos: device memcpy failed (",
       nbytes,
       " bytes, kind ",

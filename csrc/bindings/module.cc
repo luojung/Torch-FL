@@ -322,6 +322,17 @@ static PyObject* _getNativeDefaultRawStream(PyObject*, PyObject* arg) {
   return _getOwnedRawStream(arg, true);
 }
 
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+static PyObject* _getBoxedDcuStreamHandle(PyObject*, PyObject* args) {
+  HANDLE_TH_ERRORS
+  long long id;
+  int device;
+  if (!PyArg_ParseTuple(args, "Li", &id, &device)) return nullptr;
+  return PyLong_FromUnsignedLongLong(c10::flagos::BoxedDcuStreamHandle(id, device));
+  END_HANDLE_TH_ERRORS
+}
+#endif
+
 static PyObject* _getMusaCurrentRawStream(PyObject* self, PyObject* arg) {
   HANDLE_TH_ERRORS
 #ifdef USE_MUSA
@@ -849,6 +860,9 @@ extern "C" FLAGOS_EXPORT PyObject* initFlagosModule(void) {
   static PyMethodDef nativeStreamMethods[] = {
       {"_get_native_current_raw_stream", _getNativeCurrentRawStream, METH_O, nullptr},
       {"_get_native_default_raw_stream", _getNativeDefaultRawStream, METH_O, nullptr},
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+      {"_get_boxed_dcu_stream_handle", _getBoxedDcuStreamHandle, METH_VARARGS, nullptr},
+#endif
       {nullptr, nullptr, 0, nullptr}};
   if (mod && c10::flagos::HasOwnedStreams() &&
       PyModule_AddFunctions(mod, nativeStreamMethods) < 0) {

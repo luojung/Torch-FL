@@ -278,6 +278,15 @@ class Stream(torch.cuda.Stream):
     """Stream facade for the wheel's device runtime."""
 
     def __new__(cls, device=None, priority=0, **kwargs):
+        if (
+            cls is Stream
+            and not kwargs
+            and _platform() == "dcu"
+            and hasattr(_C, "_get_native_current_raw_stream")
+        ):
+            # FSDP passes this object directly to Tensor.record_stream. Python
+            # attributes on the CUDA facade cannot make it a c10 Stream.
+            return _streams.create_guard_stream(_device_index(device), priority)
         if device is None:
             device = current_device()
         try:
@@ -452,6 +461,17 @@ class Event(torch.cuda.Event):
     def __new__(
         cls, enable_timing=False, blocking=False, interprocess=False, external=False
     ):
+        if cls is Event and hasattr(_C, "_get_boxed_dcu_stream_handle"):
+            if external:
+                raise NotImplementedError(
+                    "External events are not supported by the DCU boxing guard"
+                )
+            return torch.Event(
+                device=torch.device("flagos", current_device()),
+                enable_timing=enable_timing,
+                blocking=blocking,
+                interprocess=interprocess,
+            )
         if not _has_cuda_runtime():
             # One spelling of the host-clock fallback for the arms below, so they
             # differ only in which vendor class they try first.

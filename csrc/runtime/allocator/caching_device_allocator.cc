@@ -1,6 +1,7 @@
 // Copyright (c) 2026, BAAI. All rights reserved.
 
 #include "caching_device_allocator.h"
+#include "runtime/dcu_stream.h"
 
 #if defined(USE_ASCEND)
 #include "backends/ascend_memory.h"
@@ -156,6 +157,11 @@ at::DataPtr CachingDeviceAllocator::allocate(size_t nbytes) {
   // Route the allocation through it so flagos `empty` and boxed-kernel outputs
   // share one pool. We skip the built-in block pool entirely.
   if (backend_->provides_caching()) {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+    auto dcu_ptr = c10::flagos::dcu::Allocate(nbytes);
+    return dcu_ptr;
+#endif
+
     void* ptr = backend_->caching_alloc(nbytes, /*stream=*/nullptr);
     TORCH_CHECK(
         ptr != nullptr,
@@ -193,6 +199,9 @@ at::DataPtr CachingDeviceAllocator::allocate(size_t nbytes) {
 }
 
 at::DeleterFnPtr CachingDeviceAllocator::raw_deleter() const {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+  return c10::flagos::dcu::RawDeleter();
+#endif
   return &block_deleter;
 }
 
@@ -200,6 +209,11 @@ void CachingDeviceAllocator::copy_data(
     void* dest,
     const void* src,
     std::size_t count) const {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+  c10::flagos::dcu::CopyData(dest, src, count);
+  return;
+#endif
+
   backend_->memcpy(dest, src, count, MemcpyDeviceToDevice);
 }
 
@@ -530,6 +544,13 @@ void CachingDeviceAllocator::record_stream(
   }
 
   if (backend_->provides_caching()) {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+    // The provider owns the selected flagos stream and its vendor allocator
+    // identity. Passing the opaque id to the CUDA allocator would lose it.
+    c10::flagos::dcu::RecordDataPtr(
+        ptr, c10::flagos::dcu::External(stream, ptr.device().index()));
+    return;
+#endif
     backend_->caching_record_stream(ptr.get(), stream);
     return;
   }

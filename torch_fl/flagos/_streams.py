@@ -182,6 +182,9 @@ class _GuardStream(torch.Stream):
 
     @property
     def handle(self):
+        boxed_handle = getattr(_C, "_get_boxed_dcu_stream_handle", None)
+        if boxed_handle is not None:
+            return boxed_handle(self.stream_id, self.device_index)
         return self.stream_id
 
     cuda_stream = handle
@@ -226,6 +229,12 @@ class _GuardStreams:
     def scope(self, stream):
         with stream:
             yield
+
+
+def create_guard_stream(index, priority):
+    return _GuardStream(
+        torch.Stream(device=torch.device("flagos", index), priority=priority)
+    )
 
 
 # Load only the device library selected by the wheel.
@@ -308,7 +317,9 @@ def cuda_event_stream(stream):
     ):
         # CUDA events need a CUDA stream object. The guard's ID is the raw
         # handle, which ExternalStream borrows with the correct CUDA metadata.
-        return torch.cuda.ExternalStream(stream.stream_id, device=stream.device_index)
+        return torch.cuda.ExternalStream(
+            _GuardStream(stream).handle, device=stream.device_index
+        )
     return stream
 
 

@@ -37,6 +37,7 @@
 #include "backends/tsingmicro/rng.h"
 #endif
 #include "runtime/allocator/caching_device_allocator.h"
+#include "runtime/dcu_stream.h"
 #include "dispatcher.h"
 
 #include <c10/core/impl/LocalDispatchKeySet.h>
@@ -291,6 +292,9 @@ at::Tensor& WrapperIndexPutImpl_(
 }
 
 void WrapperRecordStream(at::Tensor& self, at::Stream s) {
+#ifdef FLAGOS_DCU_VENDOR_STREAMS
+  c10::flagos::dcu::RecordDataPtr(self.storage().data_ptr(), s);
+#else
   if (!c10::flagos::CachingDeviceAllocator::is_enabled()) {
     // No-op when caching allocator is disabled.
     return;
@@ -307,6 +311,7 @@ void WrapperRecordStream(at::Tensor& self, at::Stream s) {
   c10::OptionalDeviceGuard device_guard(s.device());
 #endif
   alloc->record_stream(self.storage().data_ptr(), stream);
+#endif
 }
 
 // _fused_sdp_choice: tells PyTorch's scaled_dot_product_attention which fused
